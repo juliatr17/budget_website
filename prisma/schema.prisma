@@ -1,0 +1,92 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum TypTransakcji {
+  PRZYCHOD
+  WYDATEK
+}
+
+enum RolaSystemowa {
+  GOSC
+  UZYTKOWNIK
+  ADMIN
+}
+
+model Uzytkownik {
+  id_uzytkownik    Int                @id @default(autoincrement())
+  login            String             @unique @db.VarChar(50)
+  haslo_hash       String             @db.VarChar(255)
+  email            String             @unique @db.VarChar(255)
+  imie             String             @db.VarChar(80)
+  nazwisko         String             @db.VarChar(120)
+  aktywny          Boolean            @default(true)
+  data_rejestracji DateTime           @default(now())
+  data_modyfikacji DateTime           @updatedAt
+  transakcje       Transakcja[]
+  role_uzytkownika UzytkownikRola[]
+
+  @@map("uzytkownik")
+}
+
+model Kategoria {
+  id_kategoria Int          @id @default(autoincrement())
+  nazwa        String       @unique @db.VarChar(120)
+  opis         String?      @db.VarChar(255)
+  ikona        String?      @db.VarChar(50)
+  aktywna      Boolean      @default(true)
+  kolejnosc    Int          @default(0)
+  transakcje   Transakcja[]
+
+  @@map("kategoria")
+}
+
+model Transakcja {
+  id_transakcja    Int           @id @default(autoincrement())
+  id_uzytkownik    Int
+  id_kategoria     Int
+  typ              TypTransakcji
+  kwota            Decimal       @db.Decimal(12, 2)
+  opis             String?       @db.VarChar(255)
+  aktywny          Boolean       @default(true)
+  data_transakcji  DateTime
+  data_dodania     DateTime      @default(now())
+  data_modyfikacji DateTime      @updatedAt
+  uzytkownik       Uzytkownik    @relation(fields: [id_uzytkownik], references: [id_uzytkownik], onDelete: Restrict)
+  kategoria        Kategoria     @relation(fields: [id_kategoria], references: [id_kategoria], onDelete: Restrict)
+
+  @@index([id_uzytkownik, data_transakcji])
+  @@index([id_kategoria])
+  @@map("transakcja")
+}
+
+model Rola {
+  id_rola         Int             @id @default(autoincrement())
+  nazwa           String          @unique @db.VarChar(50)
+  aktywna         Boolean         @default(true)
+  data_utworzenia DateTime        @default(now())
+  data_dezaktywacji DateTime?
+  przypisania     UzytkownikRola[]
+
+  @@map("rola")
+}
+
+model UzytkownikRola {
+  id_uzytkownik Int
+  id_rola       Int
+  data_nadania  DateTime    @default(now())
+  data_odebrania DateTime?
+  nadana_przez  Int?
+  uzytkownik    Uzytkownik  @relation(fields: [id_uzytkownik], references: [id_uzytkownik], onDelete: Cascade)
+  rola          Rola        @relation(fields: [id_rola], references: [id_rola], onDelete: Cascade)
+
+  @@id([id_uzytkownik, id_rola, data_nadania])
+  @@index([id_uzytkownik])
+  @@index([id_rola])
+  @@map("uzytkownik_rola")
+}
