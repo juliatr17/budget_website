@@ -9,7 +9,7 @@ async function main() {
     throw new Error("Brakuje DATABASE_URL w pliku .env");
   }
 
-  // Ja tutaj tworze role systemowe, zeby od razu byly gotowe w bazie.
+  // tworze role systemowe, zeby od razu byly gotowe w bazie.
   await prisma.rola.createMany({
     data: [
       { nazwa: RolaSystemowa.GOSC },
@@ -19,7 +19,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  // Ja tutaj dodaje domyslne kategorie, ktore gosc moze przegladac.
+  // dodaje domyslne kategorie, ktore gosc moze przegladac.
   await prisma.kategoria.createMany({
     data: [
       { nazwa: "Jedzenie", opis: "Zakupy i restauracje", ikona: "utensils", kolejnosc: 1 },
@@ -37,13 +37,7 @@ async function main() {
     skipDuplicates: true,
   });
 
-  // Ja pilnuje, zeby "Inne" bylo na koncu listy z kolejnoscia 99.
-  await prisma.kategoria.updateMany({
-    where: { nazwa: "Inne" },
-    data: { kolejnosc: 99, aktywna: true },
-  });
-
-  // Ja tutaj zakladam konto admina, zeby od razu dalo sie testowac panel.
+  //zakladam konto admina, zeby od razu dalo sie testowac panel.
   const hasloHash = await bcrypt.hash("Admin123!", 10);
 
   const admin = await prisma.uzytkownik.upsert({
