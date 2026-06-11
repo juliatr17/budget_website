@@ -6,10 +6,22 @@ import { prisma } from "@/lib/prisma";
 const TOKEN_COOKIE_NAME = "budget_token";
 const TOKEN_EXPIRES_IN = "7d";
 
+export type AppRole = "GOSC" | "UZYTKOWNIK" | "ADMIN";
+
 type TokenPayload = {
-  userId: number;
+  userId?: number;
   email: string;
-  role: "GOSC" | "UZYTKOWNIK" | "ADMIN";
+  role: AppRole;
+};
+
+export type CurrentUser = {
+  id: number | null;
+  email: string;
+  login: string;
+  imie: string | null;
+  nazwisko: string | null;
+  role: AppRole;
+  data_rejestracji: string | null;
 };
 
 export async function hashPassword(password: string) {
@@ -44,6 +56,13 @@ export function verifyToken(token: string): TokenPayload | null {
   }
 }
 
+function normalizeRole(value: string | null | undefined): AppRole {
+  if (value === "ADMIN" || value === "UZYTKOWNIK" || value === "GOSC") {
+    return value;
+  }
+  return "GOSC";
+}
+
 export async function saveSessionToken(token: string) {
   const cookieStore = await cookies();
   cookieStore.set(TOKEN_COOKIE_NAME, token, {
@@ -66,7 +85,7 @@ export async function clearSessionToken() {
   });
 }
 
-export async function getCurrentUser() {
+export async function getCurrentUser(): Promise<CurrentUser | null> {
   const cookieStore = await cookies();
   const token = cookieStore.get(TOKEN_COOKIE_NAME)?.value;
 
@@ -77,6 +96,19 @@ export async function getCurrentUser() {
   const payload = verifyToken(token);
   if (!payload) {
     return null;
+  }
+
+  // Ja obsluguję tryb goscia bez konta w bazie, zeby dalo sie wejsc i obejrzec katalog.
+  if (payload.role === "GOSC" || !payload.userId) {
+    return {
+      id: null,
+      email: payload.email || "gosc@lokalnie",
+      login: "Gosc",
+      imie: null,
+      nazwisko: null,
+      role: "GOSC",
+      data_rejestracji: null,
+    };
   }
 
   const user = await prisma.uzytkownik.findUnique({
@@ -93,12 +125,15 @@ export async function getCurrentUser() {
     return null;
   }
 
-  const roleName = user.role_uzytkownika[0]?.rola.nazwa ?? "GOSC";
+  const roleName = normalizeRole(user.role_uzytkownika[0]?.rola.nazwa);
 
   return {
     id: user.id_uzytkownik,
     email: user.email,
     login: user.login,
+    imie: user.imie,
+    nazwisko: user.nazwisko,
     role: roleName,
+    data_rejestracji: user.data_rejestracji.toISOString(),
   };
 }

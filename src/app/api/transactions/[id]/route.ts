@@ -8,7 +8,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, { params }: Params) {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !user.id || user.role === "GOSC") {
     return apiError("Najpierw sie zaloguj", 401);
   }
 
@@ -55,7 +55,7 @@ export async function PUT(request: Request, { params }: Params) {
 
 export async function DELETE(_: Request, { params }: Params) {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !user.id || user.role === "GOSC") {
     return apiError("Najpierw sie zaloguj", 401);
   }
 

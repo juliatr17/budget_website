@@ -26,6 +26,12 @@ async function main() {
       { nazwa: "Transport", opis: "Paliwo i bilety", ikona: "bus", kolejnosc: 2 },
       { nazwa: "Rozrywka", opis: "Kino, hobby, wyjscia", ikona: "party-popper", kolejnosc: 3 },
       { nazwa: "Wynagrodzenie", opis: "Pensja i premie", ikona: "banknote", kolejnosc: 4 },
+      { nazwa: "Rachunki", opis: "Prad, internet, czynsz", ikona: "receipt", kolejnosc: 5 },
+      { nazwa: "Zdrowie", opis: "Leki i wizyty lekarskie", ikona: "heart-pulse", kolejnosc: 6 },
+      { nazwa: "Edukacja", opis: "Kursy, ksiazki, szkolenia", ikona: "book", kolejnosc: 7 },
+      { nazwa: "Podroze", opis: "Bilety i noclegi", ikona: "plane", kolejnosc: 8 },
+      { nazwa: "Oszczednosci", opis: "Odkładanie pieniedzy", ikona: "piggy-bank", kolejnosc: 9 },
+      { nazwa: "Inwestycje", opis: "Akcje, ETF, lokaty", ikona: "chart-line", kolejnosc: 10 },
     ],
     skipDuplicates: true,
   });

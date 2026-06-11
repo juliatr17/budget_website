@@ -4,9 +4,35 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { transactionSchema } from "@/lib/validators";
 
+function parseSummary(
+  grouped: Array<{ typ: TypTransakcji; _sum: { kwota: Prisma.Decimal | null } }>,
+) {
+  let przychody = 0;
+  let wydatki = 0;
+
+  for (const item of grouped) {
+    const amount = Number(item._sum.kwota ?? 0);
+    if (item.typ === TypTransakcji.PRZYCHOD) {
+      przychody += amount;
+    } else {
+      wydatki += amount;
+    }
+  }
+
+  return {
+    przychody,
+    wydatki,
+    saldo: przychody - wydatki,
+  };
+}
+
+function endOfDay(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
+}
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !user.id || user.role === "GOSC") {
     return apiError("Najpierw sie zaloguj", 401);
   }
 
@@ -16,6 +42,8 @@ export async function GET(request: Request) {
   const text = searchParams.get("q");
   const typ = searchParams.get("typ");
   const idKategoria = searchParams.get("id_kategoria");
+  const minKwota = searchParams.get("min_kwota");
+  const maxKwota = searchParams.get("max_kwota");
 
   const where: Prisma.TransakcjaWhereInput = {
     aktywny: true,
@@ -26,7 +54,7 @@ export async function GET(request: Request) {
   if (from || to) {
     where.data_transakcji = {};
     if (from) where.data_transakcji.gte = new Date(from);
-    if (to) where.data_transakcji.lte = new Date(to);
+    if (to) where.data_transakcji.lte = endOfDay(new Date(to));
   }
 
   if (text) {
@@ -47,6 +75,16 @@ export async function GET(request: Request) {
     }
   }
 
+  if (minKwota || maxKwota) {
+    where.kwota = {};
+    if (minKwota && !Number.isNaN(Number(minKwota))) {
+      where.kwota.gte = new Prisma.Decimal(minKwota);
+    }
+    if (maxKwota && !Number.isNaN(Number(maxKwota))) {
+      where.kwota.lte = new Prisma.Decimal(maxKwota);
+    }
+  }
+
   const transactions = await prisma.transakcja.findMany({
     where,
     include: {
@@ -55,26 +93,37 @@ export async function GET(request: Request) {
     orderBy: [{ data_transakcji: "desc" }, { id_transakcja: "desc" }],
   });
 
-  const podsumowanie = transactions.reduce(
-    (acc, item) => {
-      const kwota = Number(item.kwota);
-      if (item.typ === TypTransakcji.PRZYCHOD) {
-        acc.przychody += kwota;
-      } else {
-        acc.wydatki += kwota;
-      }
-      acc.saldo = acc.przychody - acc.wydatki;
-      return acc;
-    },
-    { przychody: 0, wydatki: 0, saldo: 0 },
-  );
+  // Ja licze saldo calkowite osobno, zeby filtrowanie listy go nie zmienialo.
+  const [podsumowanieCalkowiteRaw, podsumowanieFiltrowaneRaw] = await Promise.all([
+    prisma.transakcja.groupBy({
+      by: ["typ"],
+      where: {
+        aktywny: true,
+        id_uzytkownik: user.id,
+      },
+      _sum: { kwota: true },
+    }),
+    prisma.transakcja.groupBy({
+      by: ["typ"],
+      where,
+      _sum: { kwota: true },
+    }),
+  ]);
 
-  return apiOk({ transactions, podsumowanie });
+  const podsumowanieCalkowite = parseSummary(podsumowanieCalkowiteRaw);
+  const podsumowanieFiltrowane = parseSummary(podsumowanieFiltrowaneRaw);
+
+  return apiOk({
+    transactions,
+    licznikFiltrowanych: transactions.length,
+    podsumowanieCalkowite,
+    podsumowanieFiltrowane,
+  });
 }
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
-  if (!user) {
+  if (!user || !user.id || user.role === "GOSC") {
     return apiError("Najpierw sie zaloguj", 401);
   }
 

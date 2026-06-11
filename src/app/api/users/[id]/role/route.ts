@@ -7,7 +7,7 @@ type Params = { params: Promise<{ id: string }> };
 
 export async function PUT(request: Request, { params }: Params) {
   const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== RolaSystemowa.ADMIN) {
+  if (!currentUser || !currentUser.id || currentUser.role !== RolaSystemowa.ADMIN) {
     return apiError("Tylko administrator moze zmieniac role", 403);
   }
 

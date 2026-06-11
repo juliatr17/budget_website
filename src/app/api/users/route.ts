@@ -10,7 +10,14 @@ export async function GET() {
   }
 
   const users = await prisma.uzytkownik.findMany({
-    include: {
+    select: {
+      id_uzytkownik: true,
+      login: true,
+      email: true,
+      imie: true,
+      nazwisko: true,
+      aktywny: true,
+      data_rejestracji: true,
       role_uzytkownika: {
         where: { data_odebrania: null },
         include: { rola: true },

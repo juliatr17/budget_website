@@ -4,10 +4,14 @@ import { getCurrentUser } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { categorySchema } from "@/lib/validators";
 
-export async function GET() {
-  // Ja pokazuje kategorie wszystkim, bo nawet gosc moze obejrzec katalog.
+export async function GET(request: Request) {
+  const user = await getCurrentUser();
+  const includeInactive = new URL(request.url).searchParams.get("include_inactive") === "1";
+
+  // Ja pokazuje nieaktywne kategorie tylko adminowi, bo to jest panel zarzadzania.
+  const canSeeInactive = includeInactive && user?.role === RolaSystemowa.ADMIN;
   const categories = await prisma.kategoria.findMany({
-    where: { aktywna: true },
+    where: canSeeInactive ? undefined : { aktywna: true },
     orderBy: [{ kolejnosc: "asc" }, { nazwa: "asc" }],
   });
 

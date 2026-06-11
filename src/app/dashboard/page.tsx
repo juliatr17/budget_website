@@ -10,6 +10,24 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  if (user.role === "GOSC" || !user.id) {
+    const guestCategories = await prisma.kategoria.findMany({
+      where: { aktywna: true },
+      orderBy: [{ kolejnosc: "asc" }, { nazwa: "asc" }],
+      select: { id_kategoria: true, nazwa: true },
+    });
+
+    return (
+      <DashboardClient
+        user={user}
+        initialCategories={guestCategories}
+        initialTransactions={[]}
+        initialSummary={{ przychody: 0, wydatki: 0, saldo: 0 }}
+        initialFilteredCount={0}
+      />
+    );
+  }
+
   // Ja pobieram dane startowe na serwerze, zeby klient od razu dostal gotowy widok.
   const [initialCategories, initialTransactionsRaw] = await Promise.all([
     prisma.kategoria.findMany({
@@ -34,11 +52,27 @@ export default async function DashboardPage() {
     data_transakcji: item.data_transakcji.toISOString(),
   }));
 
+  const initialSummary = initialTransactionsRaw.reduce(
+    (acc, item) => {
+      const amount = Number(item.kwota);
+      if (item.typ === "PRZYCHOD") {
+        acc.przychody += amount;
+      } else {
+        acc.wydatki += amount;
+      }
+      acc.saldo = acc.przychody - acc.wydatki;
+      return acc;
+    },
+    { przychody: 0, wydatki: 0, saldo: 0 },
+  );
+
   return (
     <DashboardClient
       user={user}
       initialCategories={initialCategories}
       initialTransactions={initialTransactions}
+      initialSummary={initialSummary}
+      initialFilteredCount={initialTransactions.length}
     />
   );
 }

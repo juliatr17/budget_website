@@ -10,7 +10,7 @@ export default async function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen items-center justify-center bg-gradient-to-b from-indigo-50 to-white px-4">
       <div className="w-full max-w-md space-y-4">
         <AuthForm mode="register" />
         <p className="text-center text-sm text-gray-600">
