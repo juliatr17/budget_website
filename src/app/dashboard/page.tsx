@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     );
   }
 
-  // Ja pobieram dane startowe na serwerze, zeby klient od razu dostal gotowy widok.
+  // pobieramy dane startowe na serwerze, zeby klient od razu dostal gotowy widok.
   const [initialCategories, initialTransactionsRaw, initialFilteredCount] = await Promise.all([
     prisma.kategoria.findMany({
       where: { aktywna: true },

@@ -25,12 +25,12 @@ export type CurrentUser = {
 };
 
 export async function hashPassword(password: string) {
-  // Ja hashuje haslo, zeby nie trzymac go jawnie w bazie.
+  // hashuje haslo, zeby nie trzymac go jawnie w bazie.
   return bcrypt.hash(password, 10);
 }
 
 export async function verifyPassword(password: string, hash: string) {
-  // Ja porownuje haslo wpisane przez uzytkownika z hashem.
+  // porownuje haslo wpisane przez uzytkownika z hashem.
   return bcrypt.compare(password, hash);
 }
 
@@ -98,7 +98,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     return null;
   }
 
-  // Ja obsluguję tryb goscia bez konta w bazie, zeby dalo sie wejsc i obejrzec katalog.
+  // obsluga tryb goscia bez konta w bazie, zeby dalo sie wejsc i obejrzec katalog.
   if (payload.role === "GOSC" || !payload.userId) {
     return {
       id: null,

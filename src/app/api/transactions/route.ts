@@ -61,7 +61,7 @@ export async function GET(request: Request) {
     id_uzytkownik: user.id,
   };
 
-  // Ja buduje filtry warunkowo, zeby dało sie latwo szukac po wielu polach.
+  // filtruje warunkowo, zeby dało sie latwo szukac po wielu polach.
   if (from || to) {
     where.data_transakcji = {};
     if (from) where.data_transakcji.gte = new Date(from);
@@ -96,7 +96,7 @@ export async function GET(request: Request) {
     }
   }
 
-  // Ja licze saldo calkowite osobno, zeby filtrowanie listy go nie zmienialo.
+  // licze saldo calkowite osobno, zeby filtrowanie listy go nie zmienialo.
   const [transactions, totalCount, podsumowanieCalkowiteRaw, podsumowanieFiltrowaneRaw] = await Promise.all([
     prisma.transakcja.findMany({
       where,

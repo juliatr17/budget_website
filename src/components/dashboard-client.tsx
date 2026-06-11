@@ -222,7 +222,7 @@ export function DashboardClient({
       return;
     }
 
-    // Ja po zapisie czyszcze tylko czesc pol, zeby szybciej dodawac kolejne wpisy.
+    // po zapisie czyszcze tylko czesc pol, zeby szybciej dodawac kolejne wpisy.
     setForm((prev) => ({ ...prev, kwota: "", opis: "" }));
     setStatus("Dodalem transakcje");
     await loadTransactions(filters, 1);
