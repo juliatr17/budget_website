@@ -32,13 +32,26 @@ export async function POST(request: Request) {
     return apiError(parsed.error.issues[0]?.message ?? "Niepoprawne dane", 422);
   }
 
-  const created = await prisma.kategoria.create({
-    data: {
-      nazwa: parsed.data.nazwa,
-      opis: parsed.data.opis || null,
-      ikona: parsed.data.ikona || null,
-      kolejnosc: parsed.data.kolejnosc,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    // Ja przesuwam kolejnosc innych kategorii, zeby miejsca sie nie dublowaly.
+    await tx.kategoria.updateMany({
+      where: {
+        kolejnosc: { gte: parsed.data.kolejnosc },
+      },
+      data: {
+        kolejnosc: { increment: 1 },
+      },
+    });
+
+    return tx.kategoria.create({
+      data: {
+        nazwa: parsed.data.nazwa,
+        opis: parsed.data.opis || null,
+        ikona: parsed.data.ikona || null,
+        kolejnosc: parsed.data.kolejnosc,
+        aktywna: parsed.data.aktywna ?? true,
+      },
+    });
   });
 
   return apiOk(created, 201);

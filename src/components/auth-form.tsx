@@ -12,6 +12,7 @@ type FormState = {
   imie: string;
   nazwisko: string;
   password: string;
+  confirmPassword: string;
 };
 
 const initialState: FormState = {
@@ -20,20 +21,69 @@ const initialState: FormState = {
   imie: "",
   nazwisko: "",
   password: "",
+  confirmPassword: "",
 };
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const router = useRouter();
   const [form, setForm] = useState<FormState>(initialState);
   const [error, setError] = useState("");
+  const [availability, setAvailability] = useState<{
+    login: "unknown" | "available" | "taken";
+    email: "unknown" | "available" | "taken";
+  }>({
+    login: "unknown",
+    email: "unknown",
+  });
   const [loading, setLoading] = useState(false);
 
   const isRegister = mode === "register";
+
+  async function checkAvailability(field: "login" | "email", value: string) {
+    if (!value.trim()) {
+      setAvailability((prev) => ({ ...prev, [field]: "unknown" }));
+      return;
+    }
+
+    const params = new URLSearchParams();
+    params.set(field, value.trim());
+    const response = await fetch(`/api/auth/check-availability?${params.toString()}`);
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      return;
+    }
+
+    if (field === "login") {
+      setAvailability((prev) => ({
+        ...prev,
+        login: data.data.loginAvailable ? "available" : "taken",
+      }));
+    } else {
+      setAvailability((prev) => ({
+        ...prev,
+        email: data.data.emailAvailable ? "available" : "taken",
+      }));
+    }
+  }
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setLoading(true);
+
+    // Ja sprawdzam czy hasla sa takie same.
+    if (isRegister && form.password !== form.confirmPassword) {
+      setLoading(false);
+      setError("Hasla musza byc takie same");
+      return;
+    }
+
+    // Ja blokuje wysylke, gdy login albo email sa juz zajete.
+    if (isRegister && (availability.login === "taken" || availability.email === "taken")) {
+      setLoading(false);
+      setError("Popraw login lub email, bo sa juz zajete");
+      return;
+    }
 
     const endpoint = isRegister ? "/api/auth/register" : "/api/auth/login";
     const payload = isRegister
@@ -92,8 +142,18 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
               className="w-full rounded-lg border border-gray-300 p-2"
               placeholder="Login"
               value={form.login}
-              onChange={(event) => setForm((prev) => ({ ...prev, login: event.target.value }))}
+              onChange={(event) => {
+                setForm((prev) => ({ ...prev, login: event.target.value }));
+                setAvailability((prev) => ({ ...prev, login: "unknown" }));
+              }}
+              onBlur={() => void checkAvailability("login", form.login)}
             />
+            {availability.login === "taken" ? (
+              <p className="text-xs text-red-600">Ten login jest juz zajety</p>
+            ) : null}
+            {availability.login === "available" ? (
+              <p className="text-xs text-emerald-700">Login jest dostepny</p>
+            ) : null}
             <input
               className="w-full rounded-lg border border-gray-300 p-2"
               placeholder="Imie"
@@ -114,8 +174,24 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           className="w-full rounded-lg border border-gray-300 p-2"
           placeholder="Email"
           value={form.email}
-          onChange={(event) => setForm((prev) => ({ ...prev, email: event.target.value }))}
+          onChange={(event) => {
+            setForm((prev) => ({ ...prev, email: event.target.value }));
+            if (isRegister) {
+              setAvailability((prev) => ({ ...prev, email: "unknown" }));
+            }
+          }}
+          onBlur={() => {
+            if (isRegister) {
+              void checkAvailability("email", form.email);
+            }
+          }}
         />
+        {isRegister && availability.email === "taken" ? (
+          <p className="text-xs text-red-600">Ten email jest juz uzywany</p>
+        ) : null}
+        {isRegister && availability.email === "available" ? (
+          <p className="text-xs text-emerald-700">Email jest dostepny</p>
+        ) : null}
         <input
           type="password"
           className="w-full rounded-lg border border-gray-300 p-2"
@@ -123,6 +199,17 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           value={form.password}
           onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
         />
+        {isRegister ? (
+          <input
+            type="password"
+            className="w-full rounded-lg border border-gray-300 p-2"
+            placeholder="Powtorz haslo"
+            value={form.confirmPassword}
+            onChange={(event) =>
+              setForm((prev) => ({ ...prev, confirmPassword: event.target.value }))
+            }
+          />
+        ) : null}
 
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
 

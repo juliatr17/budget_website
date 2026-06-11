@@ -62,6 +62,9 @@ const initialFilters = {
   typ: "ALL" as "ALL" | FormTyp,
 };
 
+// ustawiam 3 transakcje na jednej stronie.
+const DEFAULT_PAGE_SIZE = 3;
+
 export function DashboardClient({
   user,
   initialCategories,
@@ -79,6 +82,11 @@ export function DashboardClient({
   const [summaryOverall, setSummaryOverall] = useState(initialSummary);
   const [summaryFiltered, setSummaryFiltered] = useState(initialSummary);
   const [filteredCount, setFilteredCount] = useState(initialFilteredCount);
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(DEFAULT_PAGE_SIZE);
+  const [totalPages, setTotalPages] = useState(
+    Math.max(1, Math.ceil(initialFilteredCount / DEFAULT_PAGE_SIZE)),
+  );
   const [displayLogin, setDisplayLogin] = useState(user.login);
 
   const [profile, setProfile] = useState({
@@ -105,16 +113,18 @@ export function DashboardClient({
     nazwa: "",
     opis: "",
     kolejnosc: "0",
+    aktywna: true,
   });
 
   const isGuest = user.role === "GOSC";
   const isAdmin = user.role === "ADMIN";
 
-  async function loadTransactions(nextFilters = filters) {
+  async function loadTransactions(nextFilters = filters, nextPage = page) {
     if (isGuest) {
       return;
     }
 
+    // Ja skladam parametry filtrow i strony.
     const params = new URLSearchParams();
     if (nextFilters.q) params.set("q", nextFilters.q);
     if (nextFilters.from) params.set("from", nextFilters.from);
@@ -123,6 +133,8 @@ export function DashboardClient({
     if (nextFilters.maxKwota) params.set("max_kwota", nextFilters.maxKwota);
     if (nextFilters.idKategoria) params.set("id_kategoria", nextFilters.idKategoria);
     if (nextFilters.typ !== "ALL") params.set("typ", nextFilters.typ);
+    params.set("page", String(nextPage));
+    params.set("page_size", String(pageSize));
 
     const response = await fetch(`/api/transactions?${params.toString()}`);
     const data = await response.json();
@@ -132,6 +144,8 @@ export function DashboardClient({
       setSummaryOverall(data.data.podsumowanieCalkowite);
       setSummaryFiltered(data.data.podsumowanieFiltrowane);
       setFilteredCount(data.data.licznikFiltrowanych);
+      setPage(data.data.page);
+      setTotalPages(data.data.totalPages);
     } else {
       setStatus(data.message ?? "Nie udalo sie pobrac transakcji");
     }
@@ -211,7 +225,7 @@ export function DashboardClient({
     // Ja po zapisie czyszcze tylko czesc pol, zeby szybciej dodawac kolejne wpisy.
     setForm((prev) => ({ ...prev, kwota: "", opis: "" }));
     setStatus("Dodalem transakcje");
-    await loadTransactions();
+    await loadTransactions(filters, 1);
   }
 
   async function removeTransaction(id: number) {
@@ -224,7 +238,7 @@ export function DashboardClient({
       setStatus(data.message ?? "Nie udalo sie usunac transakcji");
       return;
     }
-    await loadTransactions();
+    await loadTransactions(filters, page);
   }
 
   async function logout() {
@@ -284,6 +298,7 @@ export function DashboardClient({
       nazwa: categoryForm.nazwa,
       opis: categoryForm.opis,
       kolejnosc: Number(categoryForm.kolejnosc),
+      aktywna: categoryForm.aktywna,
     };
     const isEdit = Boolean(categoryForm.id);
     const endpoint = isEdit ? `/api/categories/${categoryForm.id}` : "/api/categories";
@@ -301,7 +316,7 @@ export function DashboardClient({
       return;
     }
 
-    setCategoryForm({ id: "", nazwa: "", opis: "", kolejnosc: "0" });
+    setCategoryForm({ id: "", nazwa: "", opis: "", kolejnosc: "0", aktywna: true });
     setStatus("Kategorie zapisane");
     await loadAdminData();
     const publicCategories = await fetch("/api/categories");
@@ -315,6 +330,24 @@ export function DashboardClient({
     const response = await fetch(`/api/categories/${id}`, { method: "DELETE" });
     const data = await response.json();
     setStatus(data.ok ? "Kategoria dezaktywowana" : data.message ?? "Nie udalo sie usunac");
+    if (data.ok) {
+      await loadAdminData();
+      const publicCategories = await fetch("/api/categories");
+      const publicData = await publicCategories.json();
+      if (publicData.ok) {
+        setCategories(publicData.data);
+      }
+    }
+  }
+
+  async function activateCategory(id: number) {
+    const response = await fetch(`/api/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ aktywna: true }),
+    });
+    const data = await response.json();
+    setStatus(data.ok ? "Kategoria aktywowana" : data.message ?? "Nie udalo sie aktywowac");
     if (data.ok) {
       await loadAdminData();
       const publicCategories = await fetch("/api/categories");
@@ -498,7 +531,7 @@ export function DashboardClient({
                 <div className="flex items-center justify-between">
                   <h2 className="text-lg font-semibold">Filtry i lista transakcji</h2>
                   <button
-                    onClick={() => void loadTransactions()}
+                    onClick={() => void loadTransactions(filters, page)}
                     className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
                   >
                     Odswiez
@@ -571,7 +604,7 @@ export function DashboardClient({
                   </select>
                   <button
                     type="button"
-                    onClick={() => void loadTransactions()}
+                    onClick={() => void loadTransactions(filters, 1)}
                     className="rounded-lg bg-indigo-600 px-4 py-2 font-semibold text-white hover:bg-indigo-700"
                   >
                     Zastosuj filtry
@@ -581,7 +614,7 @@ export function DashboardClient({
                     onClick={() => {
                       const resetFilters = { ...initialFilters };
                       setFilters(resetFilters);
-                      void loadTransactions(resetFilters);
+                      void loadTransactions(resetFilters, 1);
                     }}
                     className="rounded-lg border border-gray-300 px-4 py-2 font-semibold hover:bg-gray-50"
                   >
@@ -623,6 +656,30 @@ export function DashboardClient({
                       </article>
                     ))
                   )}
+                </div>
+
+                <div className="flex items-center justify-between border-t pt-3">
+                  <p className="text-xs text-gray-500">
+                    Strona {page} z {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      disabled={page <= 1}
+                      onClick={() => void loadTransactions(filters, page - 1)}
+                      className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+                    >
+                      Poprzednia
+                    </button>
+                    <button
+                      type="button"
+                      disabled={page >= totalPages}
+                      onClick={() => void loadTransactions(filters, page + 1)}
+                      className="rounded border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+                    >
+                      Nastepna
+                    </button>
+                  </div>
                 </div>
               </div>
             </section>
@@ -764,6 +821,16 @@ export function DashboardClient({
                     setCategoryForm((prev) => ({ ...prev, kolejnosc: event.target.value }))
                   }
                 />
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={categoryForm.aktywna}
+                    onChange={(event) =>
+                      setCategoryForm((prev) => ({ ...prev, aktywna: event.target.checked }))
+                    }
+                  />
+                  Kategoria aktywna
+                </label>
                 <div className="flex gap-2">
                   <button className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white">
                     {categoryForm.id ? "Zapisz edycje" : "Dodaj kategorie"}
@@ -771,7 +838,15 @@ export function DashboardClient({
                   {categoryForm.id ? (
                     <button
                       type="button"
-                      onClick={() => setCategoryForm({ id: "", nazwa: "", opis: "", kolejnosc: "0" })}
+                      onClick={() =>
+                        setCategoryForm({
+                          id: "",
+                          nazwa: "",
+                          opis: "",
+                          kolejnosc: "0",
+                          aktywna: true,
+                        })
+                      }
                       className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
                     >
                       Anuluj edycje
@@ -801,6 +876,7 @@ export function DashboardClient({
                             nazwa: category.nazwa,
                             opis: category.opis ?? "",
                             kolejnosc: String(category.kolejnosc ?? 0),
+                            aktywna: category.aktywna !== false,
                           })
                         }
                         className="text-indigo-700 underline"
@@ -814,7 +890,14 @@ export function DashboardClient({
                         >
                           Dezaktywuj
                         </button>
-                      ) : null}
+                      ) : (
+                        <button
+                          onClick={() => void activateCategory(category.id_kategoria)}
+                          className="text-emerald-700 underline"
+                        >
+                          Aktywuj
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

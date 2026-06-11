@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   }
 
   // Ja pobieram dane startowe na serwerze, zeby klient od razu dostal gotowy widok.
-  const [initialCategories, initialTransactionsRaw] = await Promise.all([
+  const [initialCategories, initialTransactionsRaw, initialFilteredCount] = await Promise.all([
     prisma.kategoria.findMany({
       where: { aktywna: true },
       orderBy: [{ kolejnosc: "asc" }, { nazwa: "asc" }],
@@ -43,6 +43,11 @@ export default async function DashboardPage() {
         },
       },
       orderBy: [{ data_transakcji: "desc" }, { id_transakcja: "desc" }],
+      // laduje pierwsza strone: 3 rekordy.
+      take: 3,
+    }),
+    prisma.transakcja.count({
+      where: { id_uzytkownik: user.id, aktywny: true },
     }),
   ]);
 
@@ -72,7 +77,7 @@ export default async function DashboardPage() {
       initialCategories={initialCategories}
       initialTransactions={initialTransactions}
       initialSummary={initialSummary}
-      initialFilteredCount={initialTransactions.length}
+      initialFilteredCount={initialFilteredCount}
     />
   );
 }

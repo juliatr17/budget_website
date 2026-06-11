@@ -32,8 +32,15 @@ async function main() {
       { nazwa: "Podroze", opis: "Bilety i noclegi", ikona: "plane", kolejnosc: 8 },
       { nazwa: "Oszczednosci", opis: "Odkładanie pieniedzy", ikona: "piggy-bank", kolejnosc: 9 },
       { nazwa: "Inwestycje", opis: "Akcje, ETF, lokaty", ikona: "chart-line", kolejnosc: 10 },
+      { nazwa: "Inne", opis: "Pozostale transakcje", ikona: "folder", kolejnosc: 99 },
     ],
     skipDuplicates: true,
+  });
+
+  // Ja pilnuje, zeby "Inne" bylo na koncu listy z kolejnoscia 99.
+  await prisma.kategoria.updateMany({
+    where: { nazwa: "Inne" },
+    data: { kolejnosc: 99, aktywna: true },
   });
 
   // Ja tutaj zakladam konto admina, zeby od razu dalo sie testowac panel.

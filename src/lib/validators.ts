@@ -16,6 +16,10 @@ export const registerSchema = z.object({
     .min(8, "Haslo musi miec minimum 8 znakow")
     .regex(/[A-Z]/, "Haslo musi miec duza litere")
     .regex(/[0-9]/, "Haslo musi miec cyfre"),
+  confirmPassword: z.string().min(1, "Powtorz haslo"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Hasla musza byc takie same",
+  path: ["confirmPassword"],
 });
 
 export const loginSchema = z.object({
@@ -39,6 +43,7 @@ export const categorySchema = z.object({
   opis: z.string().max(255, "Opis jest za dlugi").optional().or(z.literal("")),
   ikona: z.string().max(50, "Ikona jest za dluga").optional().or(z.literal("")),
   kolejnosc: z.coerce.number().int().min(0).default(0),
+  aktywna: z.boolean().optional(),
 });
 
 export const profileUpdateSchema = z.object({

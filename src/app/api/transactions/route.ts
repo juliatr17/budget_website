@@ -30,6 +30,14 @@ function endOfDay(value: Date) {
   return new Date(value.getFullYear(), value.getMonth(), value.getDate(), 23, 59, 59, 999);
 }
 
+function safePositiveInt(value: string | null, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
 export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user || !user.id || user.role === "GOSC") {
@@ -44,6 +52,9 @@ export async function GET(request: Request) {
   const idKategoria = searchParams.get("id_kategoria");
   const minKwota = searchParams.get("min_kwota");
   const maxKwota = searchParams.get("max_kwota");
+  const page = safePositiveInt(searchParams.get("page"), 1);
+  // Ja domyslnie zwracam 3 rekordy na strone.
+  const pageSize = Math.min(50, safePositiveInt(searchParams.get("page_size"), 3));
 
   const where: Prisma.TransakcjaWhereInput = {
     aktywny: true,
@@ -85,16 +96,18 @@ export async function GET(request: Request) {
     }
   }
 
-  const transactions = await prisma.transakcja.findMany({
-    where,
-    include: {
-      kategoria: true,
-    },
-    orderBy: [{ data_transakcji: "desc" }, { id_transakcja: "desc" }],
-  });
-
   // Ja licze saldo calkowite osobno, zeby filtrowanie listy go nie zmienialo.
-  const [podsumowanieCalkowiteRaw, podsumowanieFiltrowaneRaw] = await Promise.all([
+  const [transactions, totalCount, podsumowanieCalkowiteRaw, podsumowanieFiltrowaneRaw] = await Promise.all([
+    prisma.transakcja.findMany({
+      where,
+      include: {
+        kategoria: true,
+      },
+      orderBy: [{ data_transakcji: "desc" }, { id_transakcja: "desc" }],
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+    prisma.transakcja.count({ where }),
     prisma.transakcja.groupBy({
       by: ["typ"],
       where: {
@@ -112,12 +125,16 @@ export async function GET(request: Request) {
 
   const podsumowanieCalkowite = parseSummary(podsumowanieCalkowiteRaw);
   const podsumowanieFiltrowane = parseSummary(podsumowanieFiltrowaneRaw);
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   return apiOk({
     transactions,
-    licznikFiltrowanych: transactions.length,
+    licznikFiltrowanych: totalCount,
     podsumowanieCalkowite,
     podsumowanieFiltrowane,
+    page,
+    pageSize,
+    totalPages,
   });
 }
 
