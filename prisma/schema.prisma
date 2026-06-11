@@ -1,70 +1,80 @@
+// Ten plik definiuje strukture bazy danych PostgreSQL (tzw. schemat bazy).
+// Prisma uzywa tego pliku do wygenerowania tabel w bazie oraz typow w kodzie TypeScript.
+
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client-js" // Wskazuje, ze Prisma ma wygenerowac klienta dla JavaScript/TypeScript
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "postgresql" // Uzywamy bazy danych PostgreSQL
+  url      = env("DATABASE_URL") // Adres bazy pobieramy z pliku .env (zmienna DATABASE_URL)
 }
 
+// Typ wyliczeniowy (enum) okreslajacy typ transakcji: moze to byc tylko przychod albo wydatek
 enum TypTransakcji {
   PRZYCHOD
   WYDATEK
 }
 
+// Typ wyliczeniowy dla rol w systemie: Gosc, zwykly Uzytkownik lub Administrator
 enum RolaSystemowa {
   GOSC
   UZYTKOWNIK
   ADMIN
 }
 
+
+// Tabela przechowujaca uzytkownikow zarejestrowanych w systemie
 model Uzytkownik {
-  id_uzytkownik    Int                @id @default(autoincrement())
-  login            String             @unique @db.VarChar(50)
-  haslo_hash       String             @db.VarChar(255)
-  email            String             @unique @db.VarChar(255)
+  id_uzytkownik    Int                @id @default(autoincrement()) // Klucz glowny, automatycznie inkrementowany
+  login            String             @unique @db.VarChar(50) // Unikalny login uzytkownika (max 50 znakow)
+  haslo_hash       String             @db.VarChar(255) // Zaszyfrowane haslo za pomoca bcrypt
+  email            String             @unique @db.VarChar(255) // Unikalny email
   imie             String             @db.VarChar(80)
   nazwisko         String             @db.VarChar(120)
-  aktywny          Boolean            @default(true)
-  data_rejestracji DateTime           @default(now())
-  data_modyfikacji DateTime           @updatedAt
-  transakcje       Transakcja[]
-  role_uzytkownika UzytkownikRola[]
+  aktywny          Boolean            @default(true) // Czy konto jest aktywne
+  data_rejestracji DateTime           @default(now()) // Data rejestracji (domyslnie teraz)
+  data_modyfikacji DateTime           @updatedAt // Automatycznie aktualizowana data modyfikacji
+  transakcje       Transakcja[]       // Relacja: jeden uzytkownik moze miec wiele transakcji
+  role_uzytkownika UzytkownikRola[]   // Relacja: jeden uzytkownik moze miec przypisane role
 
-  @@map("uzytkownik")
+  @@map("uzytkownik") // Mapowanie na nazwe tabeli "uzytkownik" w bazie danych (male litery)
 }
 
+// Tabela przechowujaca kategorie transakcji (np. Jedzenie, Rozrywka, Transport)
 model Kategoria {
-  id_kategoria Int          @id @default(autoincrement())
-  nazwa        String       @unique @db.VarChar(120)
-  opis         String?      @db.VarChar(255)
-  ikona        String?      @db.VarChar(50)
-  aktywna      Boolean      @default(true)
-  kolejnosc    Int          @default(0)
-  transakcje   Transakcja[]
+  id_kategoria Int          @id @default(autoincrement()) // Klucz glowny
+  nazwa        String       @unique @db.VarChar(120) // Unikalna nazwa kategorii
+  opis         String?      @db.VarChar(255) // Opcjonalny opis kategorii
+  ikona        String?      @db.VarChar(50) // Nazwa ikony (opcjonalnie)
+  aktywna      Boolean      @default(true) // Czy kategoria jest dostepna do wyboru
+  kolejnosc    Int          @default(0) // Kolejnosc wyswietlania na liscie
+  transakcje   Transakcja[] // Relacja: do danej kategorii moze byc przypisanych wiele transakcji
 
   @@map("kategoria")
 }
 
+// Tabela przechowujaca wplaty (przychody) i wyplaty (wydatki) uzytkownikow
 model Transakcja {
-  id_transakcja    Int           @id @default(autoincrement())
-  id_uzytkownik    Int
-  id_kategoria     Int
-  typ              TypTransakcji
-  kwota            Decimal       @db.Decimal(12, 2)
-  opis             String?       @db.VarChar(255)
-  aktywny          Boolean       @default(true)
-  data_transakcji  DateTime
+  id_transakcja    Int           @id @default(autoincrement()) // Klucz glowny
+  id_uzytkownik    Int           // Powiazanie z tabelą uzytkownik (klucz obcy)
+  id_kategoria     Int           // Powiazanie z tabelą kategoria (klucz obcy)
+  typ              TypTransakcji // Typ: PRZYCHOD lub WYDATEK
+  kwota            Decimal       @db.Decimal(12, 2) // Kwota transakcji z dokladnoscia do 2 miejsc po przecinku
+  opis             String?       @db.VarChar(255) // Opcjonalny opis
+  aktywny          Boolean       @default(true) // Czy transakcja nie zostala usunieta (tzw. Soft Delete)
+  data_transakcji  DateTime      // Data, kiedy transakcja miala miejsce
   data_dodania     DateTime      @default(now())
   data_modyfikacji DateTime      @updatedAt
   uzytkownik       Uzytkownik    @relation(fields: [id_uzytkownik], references: [id_uzytkownik], onDelete: Restrict)
   kategoria        Kategoria     @relation(fields: [id_kategoria], references: [id_kategoria], onDelete: Restrict)
 
-  @@index([id_uzytkownik, data_transakcji])
+  @@index([id_uzytkownik, data_transakcji]) // Indeks dla szybszego filtrowania transakcji uzytkownika po dacie
   @@index([id_kategoria])
   @@map("transakcja")
 }
 
+// Tabela przechowujaca role dostepne w systemie (Gosc, Uzytkownik, Admin)
 model Rola {
   id_rola         Int             @id @default(autoincrement())
   nazwa           String          @unique @db.VarChar(50)
@@ -76,6 +86,7 @@ model Rola {
   @@map("rola")
 }
 
+// Tabela laczaca wielu uzytkownikow z wieloma rolami (relacja wiele-do-wielu z dodatkowymi polami)
 model UzytkownikRola {
   id_uzytkownik Int
   id_rola       Int
@@ -85,8 +96,9 @@ model UzytkownikRola {
   uzytkownik    Uzytkownik  @relation(fields: [id_uzytkownik], references: [id_uzytkownik], onDelete: Cascade)
   rola          Rola        @relation(fields: [id_rola], references: [id_rola], onDelete: Cascade)
 
-  @@id([id_uzytkownik, id_rola, data_nadania])
+  @@id([id_uzytkownik, id_rola, data_nadania]) // Zlozony klucz glowny
   @@index([id_uzytkownik])
   @@index([id_rola])
   @@map("uzytkownik_rola")
 }
+

@@ -119,12 +119,13 @@ export function DashboardClient({
   const isGuest = user.role === "GOSC";
   const isAdmin = user.role === "ADMIN";
 
+  // Funkcja pobierajaca transakcje z backendu (API) z uwzglednieniem filtrow i paginacji
   async function loadTransactions(nextFilters = filters, nextPage = page) {
     if (isGuest) {
-      return;
+      return; // Goscie nie maja transakcji w bazie danych
     }
 
-    // Ja skladam parametry filtrow i strony.
+    // Tworzymy parametry zapytania URL (np. ?q=jedzenie&page=1)
     const params = new URLSearchParams();
     if (nextFilters.q) params.set("q", nextFilters.q);
     if (nextFilters.from) params.set("from", nextFilters.from);
@@ -136,10 +137,12 @@ export function DashboardClient({
     params.set("page", String(nextPage));
     params.set("page_size", String(pageSize));
 
+    // Wysylamy asynchroniczne zadanie GET do naszego backendu API
     const response = await fetch(`/api/transactions?${params.toString()}`);
     const data = await response.json();
 
     if (data.ok) {
+      // Aktualizujemy stany Reacta, co spowoduje automatyczne przebudowanie i odswiezenie interfejsu (UI)
       setTransactions(data.data.transactions);
       setSummaryOverall(data.data.podsumowanieCalkowite);
       setSummaryFiltered(data.data.podsumowanieFiltrowane);
@@ -151,6 +154,7 @@ export function DashboardClient({
     }
   }
 
+  // Funkcja pobierajaca dane profilu zalogowanego uzytkownika
   async function loadMyProfile() {
     if (isGuest) {
       return;
@@ -172,6 +176,7 @@ export function DashboardClient({
     });
   }
 
+  // Funkcja pobierajaca dane administratora (liste kont i kategorie), wywolywana tylko gdy rola to ADMIN
   async function loadAdminData() {
     if (!isAdmin) {
       return;
@@ -193,13 +198,15 @@ export function DashboardClient({
     }
   }
 
+  // Filtrujemy kategorie, by wyswietlic w formularzu tylko te aktywne (React useMemo zapobiega zbednemu przeliczaniu)
   const aktywneKategorie = useMemo(
     () => categories.filter((category) => category.aktywna !== false),
     [categories],
   );
 
+  // Funkcja obslugujaca zapis nowej transakcji (wywolywana po kliknieciu przycisku w formularzu)
   async function addTransaction(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+    event.preventDefault(); // Zapobiega przeladowaniu calej strony po wyslaniu formularza
     if (isGuest) {
       setStatus("Gosc nie moze dodawac transakcji. Zarejestruj konto.");
       return;
@@ -207,6 +214,7 @@ export function DashboardClient({
 
     setStatus("");
 
+    // Wysylamy asynchroniczne żądanie POST z danymi transakcji w formacie JSON
     const response = await fetch("/api/transactions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -222,24 +230,27 @@ export function DashboardClient({
       return;
     }
 
-    // po zapisie czyszcze tylko czesc pol, zeby szybciej dodawac kolejne wpisy.
+    // Po poprawnym zapisaniu czyscimy formularz (oprocz typu i daty, by ulatwic kolejne wpisywanie)
     setForm((prev) => ({ ...prev, kwota: "", opis: "" }));
     setStatus("Dodalem transakcje");
-    await loadTransactions(filters, 1);
+    await loadTransactions(filters, 1); // Odswiezamy liste transakcji od 1. strony
   }
 
+  // Funkcja usuwajaca transakcje na podstawie jej ID
   async function removeTransaction(id: number) {
     if (isGuest) {
       return;
     }
+    // Wysylamy asynchroniczne żądanie DELETE do backendu
     const response = await fetch(`/api/transactions/${id}`, { method: "DELETE" });
     const data = await response.json();
     if (!response.ok || !data.ok) {
       setStatus(data.message ?? "Nie udalo sie usunac transakcji");
       return;
     }
-    await loadTransactions(filters, page);
+    await loadTransactions(filters, page); // Odswiezamy liste na aktualnej stronie
   }
+
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
