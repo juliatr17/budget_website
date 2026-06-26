@@ -1,28 +1,121 @@
 # Personal Budget Management System
 
-A full-stack web application for tracking personal income and expenses. Built with **Next.js** and **PostgreSQL**, containerized with **Docker Compose**, and deployed to **Microsoft Azure** through a **GitHub Actions** CI/CD pipeline with automated unit and end-to-end tests.
+A web application that helps people track everyday income and expenses in one place — with categories, filters, and a clear balance overview. The app is built with **Next.js** and **PostgreSQL**, runs in **Docker**, and is deployed to **Microsoft Azure** through an automated **CI/CD pipeline** with unit and end-to-end tests.
 
 **Live demo:** [budget-app-julia01.azurewebsites.net](https://budget-app-julia01-dsa0gyfdcnggadbr.polandcentral-01.azurewebsites.net)
 
----
-
-## Overview
-
-This project was developed as a cloud technologies coursework assignment. It implements a CRUD application with user authentication, category-based transaction management, role-based access (guest, user, admin), and a production deployment on Azure App Service.
-
-The frontend and backend live in a single Next.js codebase. Data is stored in PostgreSQL and accessed through Prisma ORM.
+**Author:** Yuliia Tryshyna  
+Computer Science (full-time), 2nd year — University of Silesia in Katowice  
+Academic project for the *Cloud Technologies* course.
 
 ---
 
-## Features
+## About the Application
 
-- **User authentication** — registration, login, guest mode, JWT session cookies
-- **Transactions (CRUD)** — add, view, filter, edit, and soft-delete income/expense records
-- **Categories** — predefined financial categories (Food, Transport, Bills, etc.)
-- **Dashboard** — balance summary, filtered results, pagination
-- **Account management** — profile update and password change
-- **Admin panel** — user and category management (admin role only)
-- **Security** — bcrypt password hashing, HTTPS in production, httpOnly cookies
+### The idea
+
+Most people manage money across notes, banking apps, and spreadsheets. That makes it hard to answer simple questions: *How much did I spend this month? On what? Am I ahead or behind?*
+
+This project is a **personal budget manager** — a single web page where users can record every income and expense, assign it to a category, and see their financial summary at a glance.
+
+### Why this app is useful
+
+- **One place for all transactions** — salaries, bills, groceries, and other spending in a single dashboard
+- **Categories** — each transaction belongs to a category (Food, Transport, Bills, Entertainment, etc.), so spending is easier to understand
+- **Balance overview** — the dashboard shows total income, total expenses, and current balance
+- **Filters** — search by description, date range, amount, category, or transaction type
+- **Personal accounts** — registered users keep their own data; guests can preview categories without saving transactions
+- **Admin tools** — administrators can manage users and categories for the whole system
+
+### What happens on the site
+
+1. **Home page** — short introduction with links to login or registration
+2. **Login / Register** — users sign in with email and password, or enter as a guest
+3. **Dashboard** — the main panel after login:
+   - summary cards (balance, income, expenses)
+   - form to add a new transaction (category, type, amount, date, description)
+   - filterable transaction list with pagination
+   - account tab (profile and password change)
+   - admin tab (user and category management — admin only)
+4. **API layer** — all actions (auth, transactions, categories) go through secure REST endpoints backed by PostgreSQL
+
+### User roles
+
+| Role | What they can do |
+|------|------------------|
+| **Guest** | Browse available categories, preview the app |
+| **User** | Full CRUD on their own transactions, manage profile |
+| **Admin** | Everything a user can do + manage users and categories |
+
+### Default admin account (after database seed)
+
+| Field | Value |
+|-------|-------|
+| Email | `admin@budzet.local` |
+| Password | `Admin123!` |
+
+---
+
+## Cloud Deployment & Infrastructure
+
+This repository is not only the application source code — it also documents a full **cloud deployment workflow** developed for academic requirements.
+
+### What was built in the cloud
+
+| Azure resource | Purpose |
+|----------------|---------|
+| **Resource Group** (`rg-budget-julia`) | Groups all project resources |
+| **Container Registry** (`budgetjuliaacr01`) | Stores Docker images |
+| **PostgreSQL Flexible Server** | Managed production database |
+| **App Service Plan** (`plan-budget-julia`, Linux B1) | Hosting plan for the container |
+| **Web App** (`budget-app-julia01`) | Runs the app container with HTTPS |
+
+### Docker & local environment
+
+The app is packaged as a Docker image and orchestrated with **Docker Compose**:
+
+- **`db`** — PostgreSQL 16 with persistent volume
+- **`app`** — Next.js production build; on startup runs Prisma migrations and database seed
+
+```bash
+docker compose up --build
+```
+
+### CI/CD pipeline (GitHub Actions)
+
+Every push to `main` triggers `.github/workflows/deploy.yml`:
+
+1. **Unit tests** (Vitest) — login validation, bcrypt, JWT
+2. **E2E tests** (Playwright) — guest and admin login in a real browser
+3. **Build & Deploy** — Docker image → Azure Container Registry → Azure App Service
+
+Deploy runs **only if all tests pass**.
+
+### Security
+
+- **HTTPS** — enforced by Azure App Service in production
+- **Passwords** — stored as bcrypt hashes, never in plain text
+- **Sessions** — JWT in httpOnly cookies (`secure` flag on production)
+- **Secrets** — `DATABASE_URL` and `JWT_SECRET` only in environment variables and GitHub Secrets, not in the repository
+
+### Architecture
+
+```
+User (browser, HTTPS)
+        │
+        ▼
+Azure App Service (Docker container — Next.js)
+        │
+        ▼
+Azure PostgreSQL (managed database)
+
+Developer → git push → GitHub Actions
+                           │
+              Unit tests + E2E tests
+                           │
+                           ▼
+              Azure Container Registry → App Service
+```
 
 ---
 
@@ -36,32 +129,10 @@ The frontend and backend live in a single Next.js codebase. Data is stored in Po
 | Validation | Zod |
 | Auth | JWT + bcrypt |
 | Containers | Docker, Docker Compose |
-| Cloud | Azure App Service, Azure Container Registry, Azure PostgreSQL |
+| Cloud | Azure App Service, ACR, Azure PostgreSQL |
 | CI/CD | GitHub Actions |
 | Unit tests | Vitest |
 | E2E tests | Playwright |
-
----
-
-## Architecture
-
-```
-Developer → GitHub → GitHub Actions
-                        │
-            ┌───────────┼───────────┐
-            ▼           ▼           ▼
-      Unit tests   E2E tests   (Vitest / Playwright)
-            │           │
-            └─────┬─────┘
-                  ▼ (on success)
-         Build Docker image → Azure Container Registry
-                  ▼
-         Azure App Service (HTTPS) → Azure PostgreSQL
-```
-
-**Local development:** Docker Compose runs two containers — `app` (Next.js) and `db` (PostgreSQL).
-
-**Production:** The app runs as a container on Azure App Service; the database is a managed Azure PostgreSQL Flexible Server.
 
 ---
 
@@ -70,27 +141,18 @@ Developer → GitHub → GitHub Actions
 ```
 budget_website/
 ├── src/
-│   ├── app/              # Pages and API routes (App Router)
-│   ├── components/       # UI components (auth form, dashboard)
-│   └── lib/              # Auth, Prisma client, validators, API helpers
+│   ├── app/              # Pages and API routes
+│   ├── components/       # Auth form, dashboard UI
+│   └── lib/              # Auth, Prisma, validators
 ├── prisma/
-│   ├── schema.prisma     # Database schema
-│   └── seed.ts           # Default roles, categories, admin account
-├── e2e/                  # Playwright end-to-end tests
-├── .github/workflows/    # CI/CD pipeline (tests + Azure deploy)
+│   ├── schema.prisma     # Database models
+│   └── seed.ts           # Roles, categories, admin user
+├── e2e/                  # Playwright tests (login flows)
+├── .github/workflows/    # CI/CD pipeline
 ├── Dockerfile
 ├── docker-compose.yml
 └── docker-entrypoint.sh
 ```
-
----
-
-## Prerequisites
-
-- Node.js 20+
-- npm
-- Docker Desktop (for containerized setup)
-- PostgreSQL (only if running without Docker)
 
 ---
 
@@ -106,128 +168,50 @@ docker compose up --build
 
 Open [http://localhost:3000](http://localhost:3000).
 
-The entrypoint script automatically runs `prisma db push` and seeds the database on startup.
-
 ### Option 2 — Local development
-
-1. Copy the environment file:
 
 ```bash
 cp .env.example .env
-```
-
-2. Start PostgreSQL and update `DATABASE_URL` in `.env` if needed.
-
-3. Install dependencies and prepare the database:
-
-```bash
 npm install
 npm run db:push
 npm run db:seed
-```
-
-4. Run the development server:
-
-```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
-
----
-
-## Environment Variables
+### Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (Prisma format) |
-| `JWT_SECRET` | Secret key for signing JWT session tokens (min. 32 characters) |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `JWT_SECRET` | JWT signing secret (min. 32 characters) |
 | `NODE_ENV` | `development` or `production` |
 
-Example (`.env.example`):
-
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/budget_db?schema=public"
-JWT_SECRET="change_me_to_a_long_random_secret"
-```
-
 ---
 
-## Default Admin Account
-
-After seeding the database:
-
-| Field | Value |
-|-------|-------|
-| Email | `admin@budzet.local` |
-| Password | `Admin123!` |
-
----
-
-## Available Scripts
+## Scripts
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
-| `npm run test:unit` | Run Vitest unit tests |
-| `npm run test:e2e` | Run Playwright E2E tests |
-| `npm run test` | Run all tests |
-| `npm run db:push` | Sync Prisma schema with database |
-| `npm run db:seed` | Seed roles, categories, and admin user |
+| `npm run dev` | Development server |
+| `npm run build` | Production build |
+| `npm run start` | Production server |
+| `npm run test:unit` | Vitest unit tests |
+| `npm run test:e2e` | Playwright E2E tests |
+| `npm run test` | All tests |
+| `npm run db:push` | Sync database schema |
+| `npm run db:seed` | Seed default data |
 
----
-
-## Testing
-
-### Unit tests (Vitest)
-
-Tests cover login validation (`loginSchema`), password verification (bcrypt), and JWT session tokens.
+### Running tests locally
 
 ```bash
 npm run test:unit
-```
 
-### End-to-end tests (Playwright)
-
-Tests cover guest login and admin login through the browser.
-
-```bash
-# Requires a running database (e.g. docker compose up -d db)
+# E2E — requires database
+docker compose up -d db
 npm run db:push && npm run db:seed
 npx playwright install chromium
 npm run test:e2e
 ```
-
-View the HTML report:
-
-```bash
-npx playwright show-report
-```
-
----
-
-## CI/CD Pipeline
-
-On every push to `main`, GitHub Actions runs:
-
-1. **Unit tests** — Vitest
-2. **E2E tests** — Playwright with a PostgreSQL service container
-3. **Build & Deploy** — Docker image pushed to Azure Container Registry, deployed to Azure App Service
-
-The deploy step runs only if both test jobs pass.
-
-Workflow file: `.github/workflows/deploy.yml`
-
-Required GitHub Secrets:
-
-- `AZURE_CREDENTIALS`
-- `ACR_LOGIN_SERVER`
-- `ACR_USERNAME`
-- `ACR_PASSWORD`
-- `AZURE_WEBAPP_NAME`
 
 ---
 
@@ -235,27 +219,21 @@ Required GitHub Secrets:
 
 | Endpoint | Methods | Description |
 |----------|---------|-------------|
-| `/api/auth/login` | POST | User login |
-| `/api/auth/register` | POST | User registration |
+| `/api/auth/login` | POST | Login |
+| `/api/auth/register` | POST | Registration |
 | `/api/auth/guest` | POST | Guest session |
 | `/api/auth/logout` | POST | Logout |
-| `/api/auth/me` | GET | Current user info |
 | `/api/transactions` | GET, POST | List / create transactions |
 | `/api/transactions/[id]` | PUT, DELETE | Update / delete transaction |
 | `/api/categories` | GET, POST | List / create categories |
-| `/api/categories/[id]` | PUT, DELETE | Update / delete category |
 | `/api/users/me` | GET, PUT | Profile management |
-| `/api/users/me/password` | PUT | Change password |
 
 ---
 
-## Authors
+## Author
 
-**Zuzanna Jasiak**, **Yuliia Tryshyna**  
-Computer Science (full-time), 2nd year  
-University of Silesia in Katowice
-
-Academic project for the *Cloud Technologies* course.
+**Yuliia Tryshyna**  
+GitHub: [@juliatr17](https://github.com/juliatr17)
 
 ---
 
