@@ -5,9 +5,6 @@ A web application that helps people track everyday income and expenses in one pl
 **Live demo:** [budget-app-julia01.azurewebsites.net](https://budget-app-julia01-dsa0gyfdcnggadbr.polandcentral-01.azurewebsites.net)
 
 **Author:** Yuliia Tryshyna  
-Computer Science (full-time), 2nd year — University of Silesia in Katowice  
-Academic project for the *Cloud Technologies* course.
-
 ---
 
 ## About the Application
